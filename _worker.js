@@ -1,36 +1,33 @@
-let 转码 = 'vl', 转码2 = 'ess', 符号 = '://';
+// 大王のヒミツのプロトコル (大王的秘密协议)
+let プロトコル名 = 'vl', プロトコル種類 = 'ess', 接続記号 = '://'; 
 
-// version base on commit 58686d5d125194d34a1137913b3a64ddcf55872f, time is 2024-11-27 09:26:02 UTC.
+// これは最新の版だぜ、2024年11月27日 09:26:02 UTCのやつな。
 // @ts-ignore
 import { connect } from 'cloudflare:sockets';
 
-// How to generate your own UUID:
-// [Windows] Press "Win + R", input cmd and run:  Powershell -NoExit -Command "[guid]::NewGuid()"
-let userID = 'd342d11e-d424-4583-b36e-524ab1f0afa4';
+// お前らの「識別番号」を作る方法だ (如何生成你的UUID):
+// [Windows] 「Win + R」を押してcmdを開け、Powershell -NoExit -Command "[guid]::NewGuid()"と入力して実行しろ！
+let ユーザー識別番号 = 'd342d11e-d424-4583-b36e-524ab1f0afa4'; // これがお前らの「パスポート」だ！
 
-let proxyIP = 'proxyip.zone.id'; // 确保这里有默认值或者通过环境变量设置。
-// --- 新增变量来存储 PROXYIP 的端口 ---
-let proxyPort = 443; // 默认端口为 443
-// --- 结束新增 ---
+let 回退プロキシIP = 'proxyip.zone.id'; // 万一の時の「隠し場所」のIPだ。
+let 回退プロキシポート = 443; // 「隠し場所」の「裏口」の番号だ。
 
-// --- 新增：NAT64 开关变量 ---
-let NAT64 = false; // 默认开启 NAT64
-// --- 结束新增 ---
+let NAT64通路有効 = false; // 「特殊通路」を使うか使わないか、スイッチだぜ。
 
-// 定义伪装页面的URL和处理函数
-let disguiseUrl = 'https://cf-worker-dir-bke.pages.dev'; 
+// 「偽装ページ」の「見た目」と「動作」を決めるぜ。
+let 偽装URL先 = 'https://cf-worker-dir-bke.pages.dev'; 
 
-async function serveDisguisePage() {
+async function 偽装ページ出す() {
   try {
-    const res = await fetch(disguiseUrl, { cf: { cacheEverything: true } });
+    const res = await fetch(偽装URL先, { cf: { cacheEverything: true } });
     return new Response(res.body, res);
   } catch {
     return new Response(
       `<!DOCTYPE html>
        <html>
-         <head><title>Welcome</title></head>
-         <body><h1>Cloudflare Worker 已部署成功</h1>
-         <p>此页面为静态伪装页面（远程加载失败）。</p></body>
+         <head><title>ようこそ、兄弟たち！</title></head>
+         <body><h1>大王様のCloudflare Workerは、もう「稼働中」だぜ！</h1>
+         <p>これは「ダミー」のページだ。（本物は「隠れてる」ぞ）</p></body>
        </html>`,
       {
         status: 200,
@@ -40,88 +37,76 @@ async function serveDisguisePage() {
   }
 }
 
-if (!isValidUUID(userID)) {
-	throw new Error('uuid is not valid');
+if (!isValidUUID(ユーザー識別番号)) {
+	throw new Error('「パスポート」が無効だぜ！作り直せ！');
 }
 
 export default {
 	/**
-	 * @param {import("@cloudflare/workers-types").Request} request
-	 * @param {{UUID: string, PROXYIP: string, HIDE_SUBSCRIPTION?: string, SARCASM_MESSAGE?: string, 隐藏?: string, 嘲讽语?: string, NAT64?: string}} env // 增加了 NAT64 变量的类型提示
-	 * @param {import("@cloudflare/workers-types").ExecutionContext} ctx
+	 * @param {import("@cloudflare/workers-types").Request} リクエスト
+	 * @param {{UUID: string, PROXYIP: string, HIDE_SUBSCRIPTION?: string, SARCASM_MESSAGE?: string, 隠す?: string, 皮肉なメッセージ?: string, NAT64?: string}} 環境変数 // 「NAT64」の設定も見てるぞ！
+	 * @param {import("@cloudflare/workers-types").ExecutionContext} コンテキスト
 	 * @returns {Promise<Response>}
 	 */
-	async fetch(request, env, ctx) {
+	async fetch(リクエスト, 環境変数, コンテキスト) {
 		try {
-			userID = env.UUID || userID;
-			// --- 修改：解析 PROXYIP 环境变量 ---
-			if (env.PROXYIP) {
-				const parts = env.PROXYIP.split(':');
-				proxyIP = parts[0];
-				proxyPort = parts.length > 1 ? parseInt(parts[1], 10) : 443;
+			ユーザー識別番号 = 環境変数.UUID || ユーザー識別番号; // 「パスポート」を設定するぜ。
+			
+			if (環境変数.PROXYIP) { // 「隠し場所」のIPとポートを解析するぜ。
+				const parts = 環境変数.PROXYIP.split(':');
+				回退プロキシIP = parts[0];
+				回退プロキシポート = parts.length > 1 ? parseInt(parts[1], 10) : 443;
 			}
-			// --- 结束修改 ---
+			
+            let 設定隠蔽 = false; // デフォルトは「見せる」だ。
+            let 返答嘲諷語 = "ヘヘッ、見つけちまったか？でも見せてやらねぇよ、悔しいだろ？"; // 「隠す」時の「ジョーク」だ。
 
-			// --- **新增逻辑：处理中文环境变量名映射** ---
-            // 优先级：先尝试英文变量名 (推荐)，如果不存在，再尝试中文变量名
-            let 隐藏 = false; // 默认值
-            let 嘲讽语 = "哎呀你找到了我，但是我就是不给你看，气不气，嘿嘿嘿"; // 默认值
-
-            if (env.HIDE_SUBSCRIPTION !== undefined) {
-                隐藏 = env.HIDE_SUBSCRIPTION === 'true';
-            } else if (env.隐藏 !== undefined) { // 尝试读取中文变量名
-                隐藏 = env.隐藏 === 'true';
+            if (環境変数.HIDE_SUBSCRIPTION !== undefined) {
+                設定隠蔽 = 環境変数.HIDE_SUBSCRIPTION === 'true';
+            } else if (環境変数.隠す !== undefined) { 
+                設定隠蔽 = 環境変数.隠す === 'true';
             }
 
-            if (env.SARCASM_MESSAGE !== undefined) {
-                嘲讽语 = env.SARCASM_MESSAGE;
-            } else if (env.嘲讽语 !== undefined) { // 尝试读取中文变量名
-                嘲讽语 = env.嘲讽语;
+            if (環境変数.SARCASM_MESSAGE !== undefined) {
+                返答嘲諷語 = 環境変数.SARCASM_MESSAGE;
+            } else if (環境変数.皮肉なメッセージ !== undefined) {
+                返答嘲諷語 = 環境変数.皮肉なメッセージ;
             }
 
-            // --- 新增：读取 NAT64 环境变量 ---
-            if (env.NAT64 !== undefined) {
-                NAT64 = env.NAT64 === 'true'; // 将字符串 'true' 或 'false' 转换为布尔值
+            if (環境変数.NAT64 !== undefined) { // 「特殊通路」のスイッチも確認するぜ。
+                NAT64通路有効 = 環境変数.NAT64 === 'true'; 
             }
-            // --- 结束新增 ---
 
-            // --- **调试日志：请留意这里** ---
-            console.log(`环境变量 HIDE_SUBSCRIPTION 原始值 (英文): ${env.HIDE_SUBSCRIPTION}`);
-            console.log(`环境变量 隐藏 原始值 (中文): ${env.隐藏}`);
-            console.log(`最终解析的布尔值 隐藏: ${隐藏}`);
-            console.log(`环境变量 SARCASM_MESSAGE 原始值 (英文): ${env.SARCASM_MESSAGE}`);
-            console.log(`环境变量 嘲讽语 原始值 (中文): ${env.嘲讽语}`);
-            console.log(`最终解析的嘲讽语: ${嘲讽语}`);
-            console.log(`环境变量 NAT64 原始值: ${env.NAT64}`); // 新增调试日志
-            console.log(`最终解析的布尔值 NAT64: ${NAT64}`); // 新增调试日志
-			// --- 新增调试日志 ---
-			console.log(`环境变量 PROXYIP 原始值: ${env.PROXYIP}`);
-			console.log(`最终解析的 proxyIP: ${proxyIP}`);
-			console.log(`最终解析的 proxyPort: ${proxyPort}`);
-			// --- 调试日志结束 ---
+            // 大王様の「秘密の記録」だ、よく見とけ！
+            console.log(`環境変数 HIDE_SUBSCRIPTION (英語) の値: ${環境変数.HIDE_SUBSCRIPTION}`);
+            console.log(`環境変数 隠す (日本語) の値: ${環境変数.隠す}`);
+            console.log(`最終的に決まった隠蔽設定: ${設定隠蔽}`);
+            console.log(`環境変数 SARCASM_MESSAGE (英語) の値: ${環境変数.SARCASM_MESSAGE}`);
+            console.log(`環境変数 皮肉なメッセージ (日本語) の値: ${環境変数.皮肉なメッセージ}`);
+            console.log(`最終的に決まった嘲諷語: ${返答嘲諷語}`);
+            console.log(`環境変数 NAT64 の値: ${環境変数.NAT64}`);
+            console.log(`最終的に決まったNAT64通路有効: ${NAT64通路有効}`);
+			console.log(`環境変数 PROXYIP の値: ${環境変数.PROXYIP}`);
+			console.log(`最終的に決まった 回退プロキシIP: ${回退プロキシIP}`);
+			console.log(`最終的に決まった 回退プロキシポート: ${回退プロキシポート}`);
 
-
-			const upgradeHeader = request.headers.get('Upgrade');
+			const upgradeHeader = リクエスト.headers.get('Upgrade');
 			if (!upgradeHeader || upgradeHeader !== 'websocket') {
-				const url = new URL(request.url);
+				const url = new URL(リクエスト.url);
 				switch (url.pathname) {
 					case '/':
-						// 当访问根路径时，返回伪装页面
-						return serveDisguisePage(); 
-					case `/${userID}`: {
-						// 根据 隐藏 变量决定是否显示订阅配置
-						if (隐藏) {
-							// 隐藏模式启动，给个“惊喜”
-							return new Response(嘲讽语, {
+						return 偽装ページ出す(); // 「玄関」に来たら「画皮」を見せるぜ。
+					case `/${ユーザー識別番号}`: { // 「パスポート」を見せたら「小紙条」をやるぜ。
+						if (設定隠蔽) { // 「隠す」スイッチがオンなら…
+							return new Response(返答嘲諷語, { // 「サプライズ」だ！
 								status: 200,
 								headers: {
 									"Content-Type": "text/plain;charset=utf-8",
 								}
 							});
-						} else {
-							// 正常展示，无需遮掩
-							const dynamicProtocolConfig = getDynamicProtocolConfig(userID, request.headers.get('Host'));
-							return new Response(`${dynamicProtocolConfig}`, {
+						} else { // 普段通りなら…
+							const 配置情報 = getDynamicProtocolConfig(ユーザー識別番号, リクエスト.headers.get('Host'));
+							return new Response(`${配置情報}`, { // 「小紙条」を渡すぜ。
 								status: 200,
 								headers: {
 									"Content-Type": "text/plain;charset=utf-8",
@@ -130,66 +115,61 @@ export default {
 						}
 					}
 					default:
-						return new Response('Not found', { status: 404 });
+						return new Response('ここには何もねぇぜ！', { status: 404 }); // 「迷子」か？
 				}
-			} else {
-				// 是 WebSocket 请求？那就去处理“秘密隧道”吧
-				// 传递 proxyIP 和 proxyPort 给处理函数
-				return await dynamicProtocolOverWSHandler(request, proxyIP, proxyPort);
+			} else { // もし「秘密の通路」のリクエストなら…
+				return await dynamicProtocolOverWSHandler(リクエスト, 回退プロキシIP, 回退プロキシポート); // 「隠し場所」と「裏口」の情報を渡すぜ。
 			}
 		} catch (err) {
 			/** @type {Error} */ let e = err;
-			// 哎呀，出错了，直接把错误信息吐出来
-			return new Response(e.toString());
+			return new Response(`大王様もビックリだぜ、エラーが出ちまった！：${e.toString()}`); // エラーは正直に報告だ。
 		}
 	},
 };
 
 /**
- * * @param {import("@cloudflare/workers-types").Request} request
- * @param {string} fallbackProxyIP // 新增参数，用于回退
- * @param {number} fallbackProxyPort // 新增参数，用于回退
+ * * @param {import("@cloudflare/workers-types").Request} リクエスト
+ * @param {string} 予備プロキシIPアドレス // 「備え」のIPアドレスだ。
+ * @param {number} 予備プロキシポート番号 // 「備え」のポート番号だ。
  */
-async function dynamicProtocolOverWSHandler(request, fallbackProxyIP, fallbackProxyPort) {
+async function dynamicProtocolOverWSHandler(リクエスト, 予備プロキシIPアドレス, 予備プロキシポート番号) {
 
 	/** @type {import("@cloudflare/workers-types").WebSocket[]} */
 	// @ts-ignore
-	const webSocketPair = new WebSocketPair();
-	const [client, webSocket] = Object.values(webSocketPair);
+	const webSocketペア = new WebSocketPair();
+	const [クライアント側, サーバー側WS] = Object.values(webSocketペア);
 
-	webSocket.accept();
+	サーバー側WS.accept();
 
-	let address = '';
-	let portWithRandomLog = '';
-	const log = (/** @type {string} */ info, /** @type {string | undefined} */ event) => {
-		console.log(`[${address}:${portWithRandomLog}] ${info}`, event || '');
+	let 行き先アドレス = '';
+	let ポートと乱数ログ = '';
+	const 大王ログ = (/** @type {string} */ 情報, /** @type {string | undefined} */ イベント) => {
+		console.log(`[${行き先アドレス}:${ポートと乱数ログ}] ${情報}`, イベント || '');
 	};
-	const earlyDataHeader = request.headers.get('sec-websocket-protocol') || '';
+	const earlyDataHeader = リクエスト.headers.get('sec-websocket-protocol') || '';
 
-	const readableWebSocketStream = makeReadableWebSocketStream(webSocket, earlyDataHeader, log);
+	const 読み込み可能WSストリーム = makeReadableWebSocketStream(サーバー側WS, earlyDataHeader, 大王ログ);
 
 	/** @type {{ value: import("@cloudflare/workers-types").Socket | null}}*/
-	let remoteSocketWapper = {
+	let リモートソケット格納庫 = {
 		value: null,
 	};
-	let isDns = false;
+	let DNS問い合わせか = false;
 
-	// ws --> remote (数据流向：从 WebSocket 到远程目标)
-	readableWebSocketStream.pipeTo(new WritableStream({
-		async write(chunk, controller) {
-			if (isDns) {
-				// 如果是 DNS 查询，特殊处理
-				return await handleDNSQuery(chunk, webSocket, null, log);
+	// WSから遠隔地へ (データの流れ：お前らの端末から「遠い場所」へ)
+	読み込み可能WSストリーム.pipeTo(new WritableStream({
+		async write(チャンクデータ, コントローラー) {
+			if (DNS問い合わせか) { // DNSの「問いかけ」なら、特別扱いだ。
+				return await handleDNSQuery(チャンクデータ, サーバー側WS, null, 大王ログ);
 			}
-			if (remoteSocketWapper.value) {
-				// 远程连接已建立，直接写入数据
-				const writer = remoteSocketWapper.value.writable.getWriter()
-				await writer.write(chunk);
-				writer.releaseLock();
+			if (リモートソケット格納庫.value) { // 「遠い場所」への接続が完了してたら、そのままデータを送るぜ。
+				const ライター = リモートソケット格納庫.value.writable.getWriter()
+				await ライター.write(チャンクデータ);
+				ライター.releaseLock();
 				return;
 			}
 
-			// 解析协议头部，这是“解密”的关键一步
+			// プロトコルの「暗号」を解読するぜ、これが「合言葉」と「道案内」の要だ。
 			const {
 				hasError,
 				message,
@@ -199,231 +179,220 @@ async function dynamicProtocolOverWSHandler(request, fallbackProxyIP, fallbackPr
 				rawDataIndex,
 				dynamicProtocolVersion = new Uint8Array([0, 0]),
 				isUDP,
-			} = processDynamicProtocolHeader(chunk, userID);
-			address = addressRemote;
-			portWithRandomLog = `${portRemote}--${Math.random()} ${isUDP ? 'udp ' : 'tcp '
+			} = processDynamicProtocolHeader(チャンクデータ, ユーザー識別番号);
+			行き先アドレス = addressRemote;
+			ポートと乱数ログ = `${portRemote}--${Math.random()} ${isUDP ? 'udp ' : 'tcp '
 				} `;
-			if (hasError) {
-				// 出错？直接中断，不给机会
-				log(`Error parsing VLESS header: ${message}`);
-				safeCloseWebSocket(webSocket);
+			if (hasError) { // 「暗号」が間違ってたら、即刻中止だ！
+				大王ログ(`VLESSの「暗号」解析でエラーだぜ: ${message}`);
+				safeCloseWebSocket(サーバー側WS);
 				throw new Error(message); 
 			}
-			// 如果是 UDP 但不是 DNS 端口，就拒绝
+			// UDPだけどDNSポートじゃないなら、断るぜ。
 			if (isUDP) {
 				if (portRemote === 53) {
-					isDns = true;
+					DNS問い合わせか = true;
 				} else {
-					log('UDP proxy only enabled for DNS which is port 53');
-					safeCloseWebSocket(webSocket);
-					throw new Error('UDP proxy only enable for DNS which is port 53'); 
+					大王ログ('UDPの代理はDNSポート53だけだぜ！');
+					safeCloseWebSocket(サーバー側WS);
+					throw new Error('UDPの代理はDNSポート53だけだぜ！'); 
 				}
 			}
-			// 响应头部，版本信息
+			// 応答の「暗号」ヘッダーだ、バージョン情報が入ってるぜ。
 			const dynamicProtocolResponseHeader = new Uint8Array([dynamicProtocolVersion[0], 0]);
-			const rawClientData = chunk.slice(rawDataIndex);
+			const rawClientData = チャンクデータ.slice(rawDataIndex);
 
-			if (isDns) {
-				return handleDNSQuery(rawClientData, webSocket, dynamicProtocolResponseHeader, log);
+			if (DNS問い合わせか) {
+				return handleDNSQuery(rawClientData, サーバー側WS, dynamicProtocolResponseHeader, 大王ログ);
 			}
 			
-			// 处理 TCP 出站连接，现在使用整合回退逻辑
+			// TCPの「外向き」接続を処理するぜ、今は「三道保険」のロジックを使う。
 			await handleTCPOutBound(
-				remoteSocketWapper,
+				リモートソケット格納庫,
 				addressRemote,
 				portRemote,
 				rawClientData,
-				webSocket,
+				サーバー側WS,
 				dynamicProtocolResponseHeader,
-				log,
-				fallbackProxyIP, // 传递 proxyIP
-				fallbackProxyPort, // --- 新增：传递 proxyPort ---
-                NAT64 // 传递 NAT64 变量
+				大王ログ,
+				予備プロキシIPアドレス, // 「備え」のIPだ。
+				予備プロキシポート番号, // 「備え」のポートだ。
+                NAT64通路有効 // 「特殊通路」のスイッチだ。
 			);
 		},
 		close() {
-			log(`readableWebSocketStream is close`);
+			大王ログ(`読み込み可能WSストリームが閉じられたぜ`);
 		},
-		abort(reason) {
-			log(`readableWebSocketStream is abort`, JSON.stringify(reason));
+		abort(理由) {
+			大王ログ(`読み込み可能WSストリームが中断されたぜ`, JSON.stringify(理由));
 		},
 	})).catch((err) => {
-		log('readableWebSocketStream pipeTo error', err);
+		大王ログ('読み込み可能WSストリームのパイプエラーだぜ', err);
 	});
 
 	return new Response(null, {
 		status: 101,
 		// @ts-ignore
-		webSocket: client,
+		webSocket: クライアント側,
 	});
 }
 
 /**
- * Handles outbound TCP connections with a tiered fallback: Direct -> NAT64 -> ProxyIP.
+ * TCPの「外向き」接続を「三道保険」で処理するぜ：直接 -> NAT64 -> プロキシIP。
  *
- * @param {any} remoteSocketWapper // Changed name to clearly indicate it's a wrapper
- * @param {string} addressRemote The remote address to connect to. This could be an IPv4 or a domain.
- * @param {number} portRemote The remote port to connect to.
- * @param {Uint8Array} rawClientData The raw client data to write.
- * @param {import("@cloudflare/workers-types").WebSocket} webSocket The WebSocket to pass the remote socket to.
- * @param {Uint8Array} dynamicProtocolResponseHeader The dynamicProtocol response header.
- * @param {function} log The logging function.
- * @param {string} fallbackProxyIP The proxy IP to fall back to if NAT64 fails.
- * @param {number} fallbackProxyPort The proxy port to fall back to if NAT64 fails. // --- 新增参数 ---
- * @param {boolean} enableNAT64 Whether NAT64 is enabled. // 新增参数
+ * @param {any} リモートソケット格納庫 // 「遠い場所」のソケットを包む箱だ。
+ * @param {string} 行き先遠隔アドレス 接続したい「遠い場所」の住所だ。IPv4でもドメインでもいいぜ。
+ * @param {number} 行き先遠隔ポート番号 接続したい「遠い場所」の「裏口」だ。
+ * @param {Uint8Array} 初期クライアントデータ 送りたい最初のデータだ。
+ * @param {import("@cloudflare/workers-types").WebSocket} サーバー側WS リモートソケットを渡すためのWebSocketだ。
+ * @param {Uint8Array} プロトコル応答ヘッダー プロトコルの応答ヘッダーだ。
+ * @param {function} 大王ログ 大王様のログ機能だ。
+ * @param {string} 回退用プロキシIP NAT64がダメだった時に使う「備え」のIPだ。
+ * @param {number} 回退用プロキシポート NAT64がダメだった時に使う「備え」のポートだ。
+ * @param {boolean} NAT64有効スイッチ NAT64を使うかどうかのスイッチだ。
  * @returns {Promise<void>}
  */
-async function handleTCPOutBound(remoteSocketWapper, addressRemote, portRemote, rawClientData, webSocket, dynamicProtocolResponseHeader, log, fallbackProxyIP, fallbackProxyPort, enableNAT64) {
-	let tcpSocket;
+async function handleTCPOutBound(リモートソケット格納庫, 行き先遠隔アドレス, 行き先遠隔ポート番号, 初期クライアントデータ, サーバー側WS, プロトコル応答ヘッダー, 大王ログ, 回退用プロキシIP, 回退用プロキシポート, NAT64有効スイッチ) {
+	let TCP接続ソケット;
 	
-	// --- 尝试 1: 直连 ---
+	// --- 1回目の試み: 直接「突っ込め」！ ---
 	try {
-		log(`[Attempt 1/3] Attempting direct connection to ${addressRemote}:${portRemote}`);
-		tcpSocket = connect({
-			hostname: addressRemote, // 直接使用原始地址
-			port: portRemote,
+		大王ログ(`[1/3 試行] 直接「突入」を試みてるぜ、${行き先遠隔アドレス}:${行き先遠隔ポート番号}へ！`);
+		TCP接続ソケット = connect({
+			hostname: 行き先遠隔アドレス, 
+			port: 行き先遠隔ポート番号,
 		});
-		await tcpSocket.opened; // 等待连接建立
-		log(`[Success 1/3] Successfully connected directly to ${addressRemote}:${portRemote}`);
+		await TCP接続ソケット.opened; 
+		大王ログ(`[1/3 成功] ${行き先遠隔アドレス}:${行き先遠隔ポート番号}への直接接続、成功だぜ！`);
 
-	} catch (directError) {
-		console.error(`[Error 1/3] Direct connection failed for ${addressRemote}:${portRemote}:`, directError.stack || directError.message || directError);
+	} catch (直接エラー) {
+		console.error(`[1/3 エラー] ${行き先遠隔アドレス}:${行き先遠隔ポート番号}への直接接続に失敗したぜ！`, 直接エラー.stack || 直接エラー.message || 直接エラー);
 		
-		// --- 尝试 2: 回退到 NAT64 (如果开启) ---
-		if (enableNAT64) { // 检查 NAT64 是否开启
+		// --- 2回目の試み: NAT64「特殊通路」だ (スイッチがオンなら) ---
+		if (NAT64有効スイッチ) { 
 			try {
-				log(`[Attempt 2/3] Direct failed, attempting NAT64 connection to ${addressRemote}:${portRemote}`);
-				// connectViaNAT64 应该处理 IPv4/域名到 NAT64 IPv6 的转换和连接
-				const { tcpSocket: nat64Socket } = await connectViaNAT64(addressRemote, portRemote);
-				tcpSocket = nat64Socket;
-				log(`[Success 2/3] Successfully connected via NAT64 to ${addressRemote}:${portRemote}`);
+				大王ログ(`[2/3 試行] 直接はダメか… NAT64「特殊通路」を試すぜ、${行き先遠隔アドレス}:${行き先遠隔ポート番号}へ！`);
+				const { tcpSocket: nat64ソケット } = await connectViaNAT64(行き先遠隔アドレス, 行き先遠隔ポート番号);
+				TCP接続ソケット = nat64ソケット;
+				大王ログ(`[2/3 成功] NAT64「特殊通路」経由で${行き先遠隔アドレス}:${行き先遠隔ポート番号}に接続、成功だぜ！`);
 
-			} catch (nat64Error) {
-				console.error(`[Error 2/3] NAT64 connection failed for ${addressRemote}:${portRemote}:`, nat64Error.stack || nat64Error.message || nat64Error);
+			} catch (nat64エラー) {
+				console.error(`[2/3 エラー] ${行き先遠隔アドレス}:${行き先遠隔ポート番号}へのNAT64接続も失敗したぜ！`, nat64エラー.stack || nat64エラー.message || nat64エラー);
 				
-				// --- 尝试 3: 回退到 ProxyIP ---
-				if (fallbackProxyIP) {
-					log(`[Attempt 3/3] NAT64 failed, attempting to fall back to proxyIP: ${fallbackProxyIP}:${fallbackProxyPort}`); // --- 修改：使用 fallbackProxyPort ---
+				// --- 3回目の試み: 「備え」のプロキシIPだ！ ---
+				if (回退用プロキシIP) {
+					大王ログ(`[3/3 試行] NAT64もダメか… 「備え」のプロキシIPを試すぜ: ${回退用プロキシIP}:${回退用プロキシポート}へ！`);
 					try {
-						tcpSocket = connect({
-							hostname: fallbackProxyIP,
-							port: fallbackProxyPort, // --- 修改：使用 fallbackProxyPort ---
+						TCP接続ソケット = connect({
+							hostname: 回退用プロキシIP,
+							port: 回退用プロキシポート, 
 						});
-						await tcpSocket.opened;
-						log(`[Success 3/3] Successfully connected via proxyIP to ${fallbackProxyIP}:${fallbackProxyPort}`); // --- 修改：使用 fallbackProxyPort ---
-					} catch (proxyIPError) {
-						console.error(`[Error 3/3] Fallback to proxyIP failed for ${fallbackProxyIP}:${fallbackProxyPort}:`, proxyIPError.stack || proxyIPError.message || proxyIPError); // --- 修改：使用 fallbackProxyPort ---
-						safeCloseWebSocket(webSocket); // 所有尝试都失败，关闭 WebSocket
-						return; // 退出函数，不进行后续操作
+						await TCP接続ソケット.opened;
+						大王ログ(`[3/3 成功] 「備え」のプロキシIP経由で${回退用プロキシIP}:${回退用プロキシポート}に接続、成功だぜ！`);
+					} catch (プロキシIPエラー) {
+						console.error(`[3/3 エラー] 「備え」のプロキシIPへの回退も失敗したぜ！ ${回退用プロキシIP}:${回退用プロキシポート}:`, プロキシIPエラー.stack || プロキシIPエラー.message || プロキシIPエラー);
+						safeCloseWebSocket(サーバー側WS); 
+						return; 
 					}
 				} else {
-					console.error(`[Error] NAT64 failed and no fallback proxyIP provided. Closing WebSocket.`);
-					safeCloseWebSocket(webSocket); // 没有回退选项，直接关闭 WebSocket
-					return; // 退出函数
+					console.error(`[エラー] NAT64もダメで、「備え」のプロキシIPもねぇ！WSを閉じちまうぜ。`);
+					safeCloseWebSocket(サーバー側WS); 
+					return; 
 				}
 			}
-		} else { // 如果 NAT64 未开启，则直接跳过 NAT64 尝试，进入 ProxyIP 尝试
-			log(`[Skipping NAT64] NAT64 is disabled, skipping attempt.`);
-			// --- 尝试 3: 回退到 ProxyIP ---
-			if (fallbackProxyIP) {
-				log(`[Attempt 2/2] Direct failed and NAT64 disabled, attempting to fall back to proxyIP: ${fallbackProxyIP}:${fallbackProxyPort}`); // --- 修改：使用 fallbackProxyPort ---
+		} else { // NAT64がオフなら、スキップしてプロキシIPへ直行だ！
+			大王ログ(`[NAT64スキップ] NAT64はオフだ、試行をスキップするぜ。`);
+			// --- 2回目の試み (実質2/2): 「備え」のプロキシIPだ！ ---
+			if (回退用プロキシIP) {
+				大王ログ(`[2/2 試行] 直接ダメ、NAT64もオフ… 「備え」のプロキシIPを試すぜ: ${回退用プロキシIP}:${回退用プロキシポート}へ！`);
 				try {
-					tcpSocket = connect({
-						hostname: fallbackProxyIP,
-						port: fallbackProxyPort, // --- 修改：使用 fallbackProxyPort ---
+					TCP接続ソケット = connect({
+						hostname: 回退用プロキシIP,
+						port: 回退用プロキシポート, 
 					});
-					await tcpSocket.opened;
-					log(`[Success 2/2] Successfully connected via proxyIP to ${fallbackProxyIP}:${fallbackProxyPort}`); // --- 修改：使用 fallbackProxyPort ---
-				} catch (proxyIPError) {
-					console.error(`[Error 2/2] Fallback to proxyIP failed for ${fallbackProxyIP}:${fallbackProxyPort}:`, proxyIPError.stack || proxyIPError.message || proxyIPError); // --- 修改：使用 fallbackProxyPort ---
-					safeCloseWebSocket(webSocket); // 所有尝试都失败，关闭 WebSocket
-					return; // 退出函数，不进行后续操作
+					await TCP接続ソケット.opened;
+					大王ログ(`[2/2 成功] 「備え」のプロキシIP経由で${回退用プロキシIP}:${回退用プロキシポート}に接続、成功だぜ！`);
+				} catch (プロキシIPエラー) {
+					console.error(`[2/2 エラー] 「備え」のプロキシIPへの回退も失敗したぜ！ ${回退用プロキシIP}:${回退用プロキシポート}:`, プロキシIPエラー.stack || プロキシIPエラー.message || プロキシIPエラー);
+					safeCloseWebSocket(サーバー側WS); 
+					return; 
 				}
 			} else {
-				console.error(`[Error] Direct connection failed, NAT64 is disabled, and no fallback proxyIP provided. Closing WebSocket.`);
-				safeCloseWebSocket(webSocket); // 没有回退选项，直接关闭 WebSocket
-				return; // 退出函数
+				console.error(`[エラー] 直接ダメ、NAT64もオフ、さらに「備え」もねぇ！WSを閉じちまうぜ。`);
+				safeCloseWebSocket(サーバー側WS); 
+				return; 
 			}
 		}
 	}
 
-    // 如果上面任何一种方式成功建立了 tcpSocket
-    if (tcpSocket) {
-        remoteSocketWapper.value = tcpSocket; // 更新外部的 remoteSocketWapper 引用
-        const writer = tcpSocket.writable.getWriter();
-        await writer.write(rawClientData); // 写入初始客户端数据（例如 TLS 握手）
-        writer.releaseLock();
+    if (TCP接続ソケット) { // どの手を使ってもソケットが繋がったら…
+        リモートソケット格納庫.value = TCP接続ソケット; 
+        const ライター = TCP接続ソケット.writable.getWriter();
+        await ライター.write(初期クライアントデータ); 
+        ライター.releaseLock();
 
-        // 将远程 Socket 的数据流向 WebSocket
-        // 注意：这里不再传递 retry 函数，因为回退逻辑已集中在 handleTCPOutBound 内部
-        remoteSocketToWS(tcpSocket, webSocket, dynamicProtocolResponseHeader, null, log);
+        // 「遠い場所」からのデータをWSに流すぜ。
+        remoteSocketToWS(TCP接続ソケット, サーバー側WS, プロトコル応答ヘッダー, null, 大王ログ);
     } else {
-        // 这通常不应该发生，但以防万一
-        console.error("No TCP socket established after all connection attempts. Closing WebSocket.");
-        safeCloseWebSocket(webSocket);
+        console.error("どの手を使ってもTCPソケットが繋がらねぇ！WSを閉じちまうぜ。");
+        safeCloseWebSocket(サーバー側WS);
     }
 }
 
 
 /**
- * * @param {import("@cloudflare/workers-types").WebSocket} webSocketServer
- * @param {string} earlyDataHeader for ws 0rtt
- * @param {(info: string)=> void} log for ws 0rtt
+ * * @param {import("@cloudflare/workers-types").WebSocket} webSocketサーバー
+ * @param {string} earlyDataHeader 0-RTT用だ。
+ * @param {(情報: string)=> void} 大王ログ 0-RTT用だ。
  */
-function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
-	let readableStreamCancel = false;
-	const stream = new ReadableStream({
-		start(controller) {
-			webSocketServer.addEventListener('message', (event) => {
-				if (readableStreamCancel) {
+function makeReadableWebSocketStream(webSocketサーバー, earlyDataHeader, 大王ログ) {
+	let 読み込みストリームキャンセル済み = false;
+	const ストリーム = new ReadableStream({
+		start(コントローラー) {
+			webSocketサーバー.addEventListener('message', (イベント) => {
+				if (読み込みストリームキャンセル済み) {
 					return;
 				}
-				const message = event.data;
-				controller.enqueue(message);
+				const メッセージ = イベント.data;
+				コントローラー.enqueue(メッセージ);
 			});
 
-			// The event means that the client closed the client -> server stream.
-			// However, the server -> client stream is still open until you call close() on the server side.
-			// The WebSocket protocol says that a separate close message must be sent in each direction to fully close the socket.
-			webSocketServer.addEventListener('close', () => {
-				// 客户端发来关闭请求，需要服务器也关闭
-				safeCloseWebSocket(webSocketServer);
-				if (readableStreamCancel) {
+			webSocketサーバー.addEventListener('close', () => {
+				// クライアントが「閉める」と言ってきたら、こっちも「閉める」んだ。
+				safeCloseWebSocket(webSocketサーバー);
+				if (読み込みストリームキャンセル済み) {
 					return;
 				}
-				controller.close();
-			}
-			);
-			webSocketServer.addEventListener('error', (err) => {
-				log('webSocketServer has error');
-				controller.error(err);
-			}
-			);
-			// 处理 WebSocket 0-RTT 的早期数据
+				コントローラー.close();
+			});
+			webSocketサーバー.addEventListener('error', (エラー) => {
+				大王ログ('webSocketサーバーでエラーが出たぜ！');
+				コントローラー.error(エラー);
+			});
+			// WebSocketの0-RTTの「先行データ」を処理するぜ。
 			const { earlyData, error } = base64ToArrayBuffer(earlyDataHeader);
 			if (error) {
-				controller.error(error);
+				コントローラー.error(error);
 			} else if (earlyData) {
-				controller.enqueue(earlyData);
+				コントローラー.enqueue(earlyData);
 			}
 		},
 
-		pull(controller) {
-			// 如果 WebSocket 可以停止读取（当流满时），我们可以实现背压
-			// https://streams.spec.whatwg.org/#example-rs-push-backpressure
+		pull(コントローラー) {
+			// ここで「待機」するロジックを入れられるぜ。
 		},
-		cancel(reason) {
-			// 流被取消了，多半是出问题了
-			if (readableStreamCancel) {
+		cancel(理由) {
+			// ストリームが「キャンセル」されたってことは、何かあったな！
+			if (読み込みストリームキャンセル済み) {
 					return;
 				}
-			log(`ReadableStream was canceled, due to ${reason}`)
-			readableStreamCancel = true;
-			safeCloseWebSocket(webSocketServer);
+			大王ログ(`読み込みストリームがキャンセルされたぜ、理由は${理由}だ`)
+			読み込みストリームキャンセル済み = true;
+			safeCloseWebSocket(webSocketサーバー);
 		}
 	});
 
-	return stream;
+	return ストリーム;
 
 }
 
@@ -431,351 +400,339 @@ function makeReadableWebSocketStream(webSocketServer, earlyDataHeader, log) {
 // https://github.com/zizifn/excalidraw-backup/blob/main/v2ray-protocol.excalidraw
 
 /**
- * * @param { ArrayBuffer} dynamicProtocolBuffer 
- * @param {string} userID 
+ * * @param { ArrayBuffer} プロトコルバッファ 
+ * @param {string} ユーザー識別番号 
  * @returns 
  */
 function processDynamicProtocolHeader(
-	dynamicProtocolBuffer,
-	userID
+	プロトコルバッファ,
+	ユーザー識別番号
 ) {
-	// 协议头部解析，这是“身份验证”与“路由”的关键
-	if (dynamicProtocolBuffer.byteLength < 24) {
+	// プロトコルヘッダーの「暗号解読」だ、これが「身分証明」と「行き先案内」の鍵だぜ。
+	if (プロトコルバッファ.byteLength < 24) {
 		return {
 			hasError: true,
-			message: 'invalid data',
+			message: '「無効なデータ」だぜ！',
 		};
 	}
-	const version = new Uint8Array(dynamicProtocolBuffer.slice(0, 1));
-	let isValidUser = false;
-	let isUDP = false;
-	// 校验用户 ID，确保是“自家兄弟”
-	if (stringify(new Uint8Array(dynamicProtocolBuffer.slice(1, 17))) === userID) {
-		isValidUser = true;
+	const バージョン = new Uint8Array(プロトコルバッファ.slice(0, 1));
+	let 正しいユーザーか = false;
+	let UDP通信か = false;
+	// ユーザー識別番号を照合する、「身内」かどうかの確認だ。
+	if (stringify(new Uint8Array(プロトコルバッファ.slice(1, 17))) === ユーザー識別番号) {
+		正しいユーザーか = true;
 	}
-	if (!isValidUser) {
+	if (!正しいユーザーか) {
 		return {
 			hasError: true,
-			message: 'invalid user',
+			message: '「お前は誰だ？」無効なユーザーだぜ！',
 		};
 	}
 
-	const optLength = new Uint8Array(dynamicProtocolBuffer.slice(17, 18))[0];
-	//skip opt for now
+	const オプション長 = new Uint8Array(プロトコルバッファ.slice(17, 18))[0];
+	// オプションは今は無視だぜ。
 
-	const command = new Uint8Array(
-		dynamicProtocolBuffer.slice(18 + optLength, 18 + optLength + 1)
+	const コマンド = new Uint8Array(
+		プロトコルバッファ.slice(18 + オプション長, 18 + オプション長 + 1)
 	)[0];
 
-	// 0x01 TCP
-	// 0x02 UDP
-	// 0x03 MUX
-	if (command === 1) {
-	} else if (command === 2) {
-		isUDP = true;
+	// 0x01 TCP (普通の通信)
+	// 0x02 UDP (速い通信、主にDNS)
+	// 0x03 MUX (多重化通信)
+	if (コマンド === 1) {
+	} else if (コマンド === 2) {
+		UDP通信か = true;
 	} else {
 		return {
 			hasError: true,
-			message: `command ${command} is not support, command 01-tcp,02-udp,03-mux`,
+			message: `コマンド${コマンド}は「知らない」ぜ、01はTCP、02はUDP、03はMUXだ！`,
 		};
 	}
-	const portIndex = 18 + optLength + 1;
-	const portBuffer = dynamicProtocolBuffer.slice(portIndex, portIndex + 2);
-	// 端口是大端序
-	const portRemote = new DataView(portBuffer).getUint16(0);
+	const ポート位置 = 18 + オプション長 + 1;
+	const ポートバッファ = プロトコルバッファ.slice(ポート位置, ポート位置 + 2);
+	// ポート番号は「デカい方から数える」ぜ (ビッグエンディアン)。
+	const リモートポート = new DataView(ポートバッファ).getUint16(0);
 
-	let addressIndex = portIndex + 2;
-	const addressBuffer = new Uint8Array(
-		dynamicProtocolBuffer.slice(addressIndex, addressIndex + 1)
+	let アドレス位置 = ポート位置 + 2;
+	const アドレスバッファ = new Uint8Array(
+		プロトコルバッファ.slice(アドレス位置, アドレス位置 + 1)
 	);
 
-	// 1--> ipv4  addressLength =4
-	// 2--> domain name
-	// 3--> ipv6  addressLength =16
-	const addressType = addressBuffer[0];
-	let addressLength = 0;
-	let addressValueIndex = addressIndex + 1;
-	let addressValue = '';
-	switch (addressType) {
+	// 1--> ipv4  addressLength =4 (普通の数字の住所)
+	// 2--> domain name (文字の住所)
+	// 3--> ipv6  addressLength =16 (長い数字の住所)
+	const アドレス種類 = アドレスバッファ[0];
+	let アドレス長 = 0;
+	let アドレス値位置 = アドレス位置 + 1;
+	let アドレス値 = '';
+	switch (アドレス種類) {
 		case 1:
-			addressLength = 4;
-			addressValue = new Uint8Array(
-				dynamicProtocolBuffer.slice(addressValueIndex, addressValueIndex + addressLength)
+			アドレス長 = 4;
+			アドレス値 = new Uint8Array(
+				プロトコルバッファ.slice(アドレス値位置, アドレス値位置 + アドレス長)
 			).join('.');
 			break;
 		case 2:
-			addressLength = new Uint8Array(
-				dynamicProtocolBuffer.slice(addressValueIndex, addressValueIndex + 1)
+			アドレス長 = new Uint8Array(
+				プロトコルバッファ.slice(アドレス値位置, アドレス値位置 + 1)
 			)[0];
-			addressValueIndex += 1;
-			addressValue = new TextDecoder().decode(
-				dynamicProtocolBuffer.slice(addressValueIndex, addressValueIndex + addressLength)
+			アドレス値位置 += 1;
+			アドレス値 = new TextDecoder().decode(
+				プロトコルバッファ.slice(アドレス値位置, アドレス値位置 + アドレス長)
 			);
 			break;
 		case 3:
-			addressLength = 16;
-			const dataView = new DataView(
-				dynamicProtocolBuffer.slice(addressValueIndex, addressValueIndex + addressLength)
+			アドレス長 = 16;
+			const データビュー = new DataView(
+				プロトコルバッファ.slice(アドレス値位置, アドレス値位置 + アドレス長)
 			);
-			// 2001:0db8:85a3:0000:0000:8a2e:0370:7334
-			const ipv6 = [];
+			const IPv6アドレス部品 = [];
 			for (let i = 0; i < 8; i++) {
-				ipv6.push(dataView.getUint16(i * 2).toString(16));
+				IPv6アドレス部品.push(データビュー.getUint16(i * 2).toString(16));
 			}
-			addressValue = ipv6.join(':');
-			// seems no need add [] for ipv6
+			アドレス値 = IPv6アドレス部品.join(':');
 			break;
 		default:
 			return {
 				hasError: true,
-				message: `invild  addressType is ${addressType}`,
+				message: `「変な住所の種類」だぜ！ ${アドレス種類}は知らない！`,
 			};
 	}
-	if (!addressValue) {
+	if (!アドレス値) {
 		return {
 			hasError: true,
-			message: `addressValue is empty, addressType is ${addressType}`,
+			message: `住所が空っぽだぜ、種類は${アドレス種類}なのに！`,
 		};
 	}
 
 	return {
 		hasError: false,
-		addressRemote: addressValue,
-		addressType,
-		portRemote,
-		rawDataIndex: addressValueIndex + addressLength,
-		dynamicProtocolVersion: version,
-		isUDP,
+		addressRemote: アドレス値,
+		addressType: アドレス種類,
+		portRemote: リモートポート,
+		rawDataIndex: アドレス値位置 + アドレス長,
+		dynamicProtocolVersion: バージョン,
+		isUDP: UDP通信か,
 	};
 }
 
 
 /**
- * * @param {import("@cloudflare/workers-types").Socket} remoteSocket 
- * @param {import("@cloudflare/workers-types").WebSocket} webSocket 
- * @param {ArrayBuffer} dynamicProtocolResponseHeader 
- * @param {(() => Promise<void>) | null} retry // 这个参数现在不再使用，但保留了签名
- * @param {*} log 
+ * * @param {import("@cloudflare/workers-types").Socket} リモートソケット 
+ * @param {import("@cloudflare/workers-types").WebSocket} サーバー側WS 
+ * @param {ArrayBuffer} プロトコル応答ヘッダー 
+ * @param {(() => Promise<void>) | null} リトライ // このパラメータはもう使わねぇぜ。
+ * @param {*} 大王ログ 
  */
-async function remoteSocketToWS(remoteSocket, webSocket, dynamicProtocolResponseHeader, retry, log) {
-	// remote--> ws (数据流向：从远程目标到 WebSocket)
+async function remoteSocketToWS(リモートソケット, サーバー側WS, プロトコル応答ヘッダー, リトライ, 大王ログ) {
+	// 「遠い場所」からWSへ (データの流れ：遠い場所からお前らの端末へ)
 	/** @type {ArrayBuffer | null} */
-	let dynamicProtocolHeader = dynamicProtocolResponseHeader;
-	let hasIncomingData = false; // 检查远程 Socket 是否有传入数据
-	await remoteSocket.readable
+	let プロトコルヘッダー = プロトコル応答ヘッダー;
+	let 受信データあり = false; 
+	await リモートソケット.readable
 		.pipeTo(
 			new WritableStream({
 				start() {
 				},
 				/**
-				 * * @param {Uint8Array} chunk 
-				 * @param {*} controller 
+				 * * @param {Uint8Array} チャンク 
+				 * @param {*} コントローラー 
 				 */
-				async write(chunk, controller) {
-					hasIncomingData = true;
-					if (webSocket.readyState !== WS_READY_STATE_OPEN) {
-						controller.error(
-							'webSocket.readyState is not open, maybe close'
+				async write(チャンク, コントローラー) {
+					受信データあり = true;
+					if (サーバー側WS.readyState !== WS_READY_STATE_OPEN) {
+						コントローラー.error(
+							'webSocketが「開いてねぇ」ぞ、たぶん閉じちまったな！'
 						);
 					}
-					if (dynamicProtocolHeader) {
-						// 首次发送带头部信息
-						webSocket.send(await new Blob([dynamicProtocolHeader, chunk]).arrayBuffer());
-						dynamicProtocolHeader = null;
-					} else {
-						// 后续直接发送数据
-						webSocket.send(chunk);
+					if (プロトコルヘッダー) { // 最初の送信はヘッダー付きでだ。
+						サーバー側WS.send(await new Blob([プロトコルヘッダー, チャンク]).arrayBuffer());
+						プロトコルヘッダー = null;
+					} else { // その後はデータだけ送るぜ。
+						サーバー側WS.send(チャンク);
 					}
 				},
 				close() {
-					log(`remoteConnection!.readable is close with hasIncomingData is ${hasIncomingData}`);
-					// 远程连接关闭，关闭 WebSocket
-					safeCloseWebSocket(webSocket);
+					大王ログ(`リモート接続が閉じられたぜ、受信データありは${受信データあり}だ`);
+					safeCloseWebSocket(サーバー側WS); 
 				},
-				abort(reason) {
-					console.error(`remoteConnection!.readable abort`, reason);
-					safeCloseWebSocket(webSocket); // 远程连接中断，关闭 WebSocket
+				abort(理由) {
+					console.error(`リモート接続が中断されたぜ`, 理由);
+					safeCloseWebSocket(サーバー側WS); 
 				},
 			})
 		)
 		.catch((error) => {
 			console.error(
-				`remoteSocketToWS has exception `,
+				`remoteSocketToWSで「事件」が起きたぜ `,
 				error.stack || error
 			);
-			safeCloseWebSocket(webSocket); // 发生异常，关闭 WebSocket
+			safeCloseWebSocket(サーバー側WS); 
 		});
-
-	// !!! IMPORTANT: The retry fallback logic is now handled in handleTCPOutBound
-	// This block is intentionally removed as it would conflict with the new logic.
-	// if (hasIncomingData === false && retry) {
-	// 	log(`retry`)
-	// 	retry();
-	// }
 }
 
 /**
- * * @param {string} base64Str 
+ * * @param {string} base64文字列 
  * @returns 
  */
-function base64ToArrayBuffer(base64Str) {
-	if (!base64Str) {
+function base64ToArrayBuffer(base64文字列) {
+	if (!base64文字列) {
 		return { error: null };
 	}
 	try {
-		// Base64 解码，处理 URL 安全字符
-		base64Str = base64Str.replace(/-/g, '+').replace(/_/g, '/');
-		const decode = atob(base64Str);
-		const arryBuffer = Uint8Array.from(decode, (c) => c.charCodeAt(0));
-		return { earlyData: arryBuffer.buffer, error: null };
+		// Base64を解読するぜ、URLの「変な文字」も直す。
+		base64文字列 = base64文字列.replace(/-/g, '+').replace(/_/g, '/');
+		const デコード済み = atob(base64文字列);
+		const 配列バッファ = Uint8Array.from(デコード済み, (c) => c.charCodeAt(0));
+		return { earlyData: 配列バッファ.buffer, error: null };
 	} catch (error) {
 		return { error };
 	}
 }
 
 /**
- * This is not real UUID validation
+ * これは「ホンモノの」UUID検証じゃないぜ。
  * @param {string} uuid 
  */
 function isValidUUID(uuid) {
-	// UUID 格式校验，确保是“合法身份”
+	// UUIDの形式をチェックする、「本物」かどうかの確認だ。
 	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[4][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 	return uuidRegex.test(uuid);
 }
 
-const WS_READY_STATE_OPEN = 1;
-const WS_READY_STATE_CLOSING = 2;
+const WS_状態_オープン = 1;
+const WS_状態_クローズ中 = 2;
 /**
- * Normally, WebSocket will not has exceptions when close.
- * @param {import("@cloudflare/workers-types").WebSocket} socket
+ * 通常、WebSocketはクローズ時に例外を出さないはずだ。
+ * @param {import("@cloudflare/workers-types").WebSocket} ソケット
  */
-function safeCloseWebSocket(socket) {
+function safeCloseWebSocket(ソケット) {
 	try {
-		// 安全关闭 WebSocket，避免“意外”
-		if (socket.readyState === WS_READY_STATE_OPEN || socket.readyState === WS_READY_STATE_CLOSING) {
-			socket.close();
+		// WebSocketを「安全に」閉じる、変なことにならないようにだ。
+		if (ソケット.readyState === WS_状態_オープン || ソケット.readyState === WS_状態_クローズ中) {
+			ソケット.close();
 		}
 	} catch (error) {
-		console.error('safeCloseWebSocket error', error);
+		console.error('safeCloseWebSocketでエラーだぜ', error);
 	}
 }
 
-const byteToHex = [];
+const バイトをHEXへ = [];
 for (let i = 0; i < 256; ++i) {
-	byteToHex.push((i + 256).toString(16).slice(1));
+	バイトをHEXへ.push((i + 256).toString(16).slice(1));
 }
-function unsafeStringify(arr, offset = 0) {
-	return (byteToHex[arr[offset + 0]] + byteToHex[arr[offset + 1]] + byteToHex[arr[offset + 2]] + byteToHex[arr[offset + 3]] + "-" + byteToHex[arr[offset + 4]] + byteToHex[arr[offset + 5]] + "-" + byteToHex[arr[offset + 6]] + byteToHex[arr[offset + 7]] + "-" + byteToHex[arr[offset + 8]] + byteToHex[arr[offset + 9]] + "-" + byteToHex[arr[offset + 10]] + byteToHex[arr[offset + 11]] + byteToHex[arr[offset + 12]] + byteToHex[arr[offset + 13]] + byteToHex[arr[offset + 14]] + byteToHex[arr[offset + 15]]).toLowerCase();
+function unsafeStringify(arr, オフセット = 0) {
+	return (バイトをHEXへ[arr[オフセット + 0]] + バイトをHEXへ[arr[オフセット + 1]] + バイトをHEXへ[arr[オフセット + 2]] + バイトをHEXへ[arr[オフセット + 3]] + "-" + バイトをHEXへ[arr[オフセット + 4]] + バイトをHEXへ[arr[オフセット + 5]] + "-" + バイトをHEXへ[arr[オフセット + 6]] + バイトをHEXへ[arr[オフセット + 7]] + "-" + バイトをHEXへ[arr[オフセット + 8]] + バイトをHEXへ[arr[オフセット + 9]] + "-" + バイトをHEXへ[arr[オフセット + 10]] + バイトをHEXへ[arr[オフセット + 11]] + バイトをHEXへ[arr[オフセット + 12]] + バイトをHEXへ[arr[オフセット + 13]] + バイトをHEXへ[arr[オフセット + 14]] + バイトをHEXへ[arr[オフセット + 15]]).toLowerCase();
 }
-function stringify(arr, offset = 0) {
-	const uuid = unsafeStringify(arr, offset);
+function stringify(arr, オフセット = 0) {
+	const uuid = unsafeStringify(arr, オフセット);
 	if (!isValidUUID(uuid)) {
-		throw TypeError("Stringified UUID is invalid");
+		throw TypeError("文字列化されたUUIDは「偽物」だぜ！");
 	}
 	return uuid;
 }
 
 /**
- * * @param {ArrayBuffer} udpChunk 
- * @param {import("@cloudflare/workers-types").WebSocket} webSocket 
- * @param {ArrayBuffer} dynamicProtocolResponseHeader 
- * @param {(string)=> void} log 
+ * * @param {ArrayBuffer} UDPチャンク 
+ * @param {import("@cloudflare/workers-types").WebSocket} サーバー側WS 
+ * @param {ArrayBuffer} プロトコル応答ヘッダー 
+ * @param {(string)=> void} 大王ログ 
  */
-async function handleDNSQuery(udpChunk, webSocket, dynamicProtocolResponseHeader, log) {
-	// DNS 查询处理，始终使用硬编码的 DNS 服务器
+async function handleDNSQuery(UDPチャンク, サーバー側WS, プロトコル応答ヘッダー, 大王ログ) {
+	// DNSの「問いかけ」を処理するぜ、これはいつでも「決まった場所」に送るんだ。
 	try {
-		const dnsServer = '8.8.8.8'; 
-		const dnsPort = 53;
+		const DNSサーバーアドレス = '8.8.8.8'; 
+		const DNSポート番号 = 53;
 		/** @type {ArrayBuffer | null} */
-		let dynamicProtocolHeader = dynamicProtocolResponseHeader;
+		let プロトコルヘッダー = プロトコル応答ヘッダー;
 		/** @type {import("@cloudflare/workers-types").Socket} */
-		const tcpSocket = connect({
-			hostname: dnsServer,
-			port: dnsPort,
+		const TCPソケット = connect({
+			hostname: DNSサーバーアドレス,
+			port: DNSポート番号,
 		});
 
-		log(`connected to ${dnsServer}:${dnsPort}`);
-		const writer = tcpSocket.writable.getWriter();
-		await writer.write(udpChunk);
-		writer.releaseLock();
-		await tcpSocket.readable.pipeTo(new WritableStream({
-			async write(chunk) {
-				if (webSocket.readyState === WS_READY_STATE_OPEN) {
-					if (dynamicProtocolHeader) {
-						webSocket.send(await new Blob([dynamicProtocolHeader, chunk]).arrayBuffer());
-						dynamicProtocolHeader = null;
+		大王ログ(`${DNSサーバーアドレス}:${DNSポート番号}に繋がったぜ！`);
+		const ライター = TCPソケット.writable.getWriter();
+		await ライター.write(UDPチャンク);
+		ライター.releaseLock();
+		await TCPソケット.readable.pipeTo(new WritableStream({
+			async write(チャンク) {
+				if (サーバー側WS.readyState === WS_状態_オープン) {
+					if (プロトコルヘッダー) {
+						サーバー側WS.send(await new Blob([プロトコルヘッダー, チャンク]).arrayBuffer());
+						プロトコルヘッダー = null;
 					} else {
-						webSocket.send(chunk);
+						サーバー側WS.send(チャンク);
 					}
 				}
 			},
 			close() {
-				log(`dns server(${dnsServer}) tcp is close`);
+				大王ログ(`DNSサーバー(${DNSサーバーアドレス})のTCP���閉じられたぜ`);
 			},
-			abort(reason) {
-				console.error(`dns server(${dnsServer}) tcp is abort`, reason);
+			abort(理由) {
+				console.error(`DNSサーバー(${DNSサーバーアドレス})のTCPが中断されたぜ`, 理由);
 			},
 		}));
 	} catch (error) {
 		console.error(
-			`handleDNSQuery have exception, error: ${error.message}`
+			`handleDNSQueryで「事件」が起きたぜ、エラー: ${error.message}`
 		);
 	}
 }
 
 /**
- * * @param {string} userID 
- * * @param {string | null} hostName
+ * * @param {string} ユーザー識別番号 
+ * * @param {string | null} ホスト名
  * @returns {string}
  */
-function getDynamicProtocolConfig(userID, hostName) {
-	// 生成 V2Ray 和 Clash-Meta 配置，这是“订阅信息”的载体
-	const protocol = 转码 + 转码2; 
-	const dynamicProtocolMain = 
-	`${protocol}${符号}${userID}@${hostName}:443`+
-	`?encryption=none&security=tls&sni=${hostName}&fp=randomized&type=ws&host=${hostName}&path=%2F%3Fed%3D2048#${hostName}`;
+function getDynamicProtocolConfig(ユーザー識別番号, ホスト名) {
+	// V2RayとClash-Metaの「装備リスト」を作るぜ、これが「秘密の連絡網」だ。
+	const 最終プロトコル = プロトコル名 + プロトコル種類; 
+	const メイン設定 = 
+	`${最終プロトコル}${接続記号}${ユーザー識別番号}@${ホスト名}:443`+
+	`?encryption=none&security=tls&sni=${ホスト名}&fp=randomized&type=ws&host=${ホスト名}&path=%2F%3Fed%3D2048#${ホスト名}`;
 	
 	return `
 ################################################################
 v2ray
 ---------------------------------------------------------------
-${dynamicProtocolMain}
+${メイン設定}
 ---------------------------------------------------------------
 ################################################################
 clash-meta
 ---------------------------------------------------------------
-- type: ${转码 + 转码2}
-  name: ${hostName}
-  server: ${hostName}
+- type: ${最終プロトコル}
+  name: ${ホスト名}
+  server: ${ホスト名}
   port: 443
-  uuid: ${userID}
+  uuid: ${ユーザー識別番号}
   network: ws
   tls: true
   udp: false
-  sni: ${hostName}
+  sni: ${ホスト名}
   client-fingerprint: chrome
   ws-opts:
     path: "/?ed=2048"
     headers:
-      host: ${hostName}
+      host: ${ホスト名}
 ---------------------------------------------------------------
 ################################################################
 `;
 }
 
-// --- NAT64 辅助函数 (这些是唯一应该保留的定义) ---
+// --- NAT64の「小道具」 (これだけは残しとけよ) ---
 
-// 将IPv4地址转换为NAT64 IPv6地址
+// IPv4の住所をNAT64のIPv6住所に「変身」させるぜ。
 function convertToNAT64IPv6(ipv4Address) {
     const parts = ipv4Address.split('.');
     if (parts.length !== 4) {
-        throw new Error('Invalid IPv4 address format for NAT64 conversion.');
+        throw new Error('NAT64変換には「ちゃんとした」IPv4住所が必要だぜ！');
     }
     
     const hex = parts.map(part => {
         const num = parseInt(part, 10);
         if (num < 0 || num > 255) {
-            throw new Error('Invalid IPv4 address segment for NAT64 conversion.');
+            throw new Error('NAT64変換のためのIPv4住所がおかしいぜ！');
         }
         return num.toString(16).padStart(2, '0');
     });
@@ -783,24 +740,23 @@ function convertToNAT64IPv6(ipv4Address) {
     return `2602:fc59:b0:64::${hex[0]}${hex[1]}:${hex[2]}${hex[3]}`;
 }
 
-// 获取域名的IPv4地址并转换为NAT64 IPv6地址
+// ドメインのIPv4住所を手に入れて、NAT64のIPv6住所に「変身」させるぜ。
 async function getNAT64IPv6FromDomain(domain) {
-    // 为 fetch 请求定义一个超时
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 秒超时
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒待って、ダメなら「諦める」ぜ。
 
     try {
         const dnsQuery = await fetch(`https://1.1.1.1/dns-query?name=${domain}&type=A`, {
             headers: {
                 'Accept': 'application/dns-json'
             },
-            signal: controller.signal // 应用 AbortController 信号
+            signal: controller.signal 
         });
         
-        clearTimeout(timeoutId); // 如果 fetch 在时间内完成，则清除超时
+        clearTimeout(timeoutId); 
 
         if (!dnsQuery.ok) {
-            throw new Error(`DNS query failed with status: ${dnsQuery.status}`);
+            throw new Error(`DNSの「問いかけ」が失敗したぜ！ステータス: ${dnsQuery.status}`);
         }
 
         const dnsResult = await dnsQuery.json();
@@ -811,17 +767,17 @@ async function getNAT64IPv6FromDomain(domain) {
                 return convertToNAT64IPv6(ipv4Address);
             }
         }
-        throw new Error('No A record found for domain or unable to resolve IPv4 address.');
+        throw new Error('ドメインのAレコードが見つからねぇか、IPv4住所が解決できねぇぜ。');
     } catch (err) {
-        clearTimeout(timeoutId); // 确保在错误时也清除超时
+        clearTimeout(timeoutId); 
         if (err.name === 'AbortError') {
-            throw new Error(`DNS resolution for NAT64 timed out for domain: ${domain}`);
+            throw new Error(`NAT64のDNS解決がタイムアウトしたぜ、ドメイン: ${domain}`);
         }
-        throw new Error(`DNS resolution for NAT64 failed: ${err.message}`);
+        throw new Error(`NAT64のDNS解決に失敗したぜ: ${err.message}`);
     }
 }
 
-// 结合 NAT64 转换和连接的函数
+// NAT64の「変身」と接続を組み合わせる関数だ。
 async function connectViaNAT64(address, port) {
     let nat64Address;
     const ipv4Regex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
@@ -832,10 +788,10 @@ async function connectViaNAT64(address, port) {
         nat64Address = await getNAT64IPv6FromDomain(address);
     }
 
-    const tcpSocket = connect({
-        hostname: `[${nat64Address}]`, // IPv6 地址需要方括号
+    const TCPソケット = connect({
+        hostname: `[${nat64Address}]`, 
         port: port,
     });
-    await tcpSocket.opened;
-    return { tcpSocket }; 
-	}
+    await TCPソケット.opened;
+    return { tcpSocket: TCPソケット }; 
+												  }
