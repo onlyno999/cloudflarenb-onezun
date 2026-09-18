@@ -1,3 +1,7 @@
+### 兼容日期
+
+2025.9.20日
+
 ### 环境变量配置表 (Variables and Secrets)
 
 | 变量名称 (Variable Name) | 类型 (Type) | 示例值 (Value) | 说明 |
