@@ -80,10 +80,6 @@ const AI_DOMAINS = [
   'notebooklm.google.com',
   'meta.ai',
   'mistral.ai',
-  'deepseek.com',
-  'moonshot.ai',
-  'kimi.com',
-  'qwen.ai',
   'openrouter.ai',
   'groq.com',
   'cohere.com',
@@ -112,7 +108,6 @@ const AI_DOMAINS = [
   'runwayml.com',
   'lumalabs.ai',
   'pika.art',
-  'klingai.com',
   'sora.com',
   'heygen.com',
   'elevenlabs.io',
@@ -120,9 +115,7 @@ const AI_DOMAINS = [
   'suno.ai',
   'udio.com',
   'leonardo.ai',
-  'ideogram.ai',
-  'hailuoai.com',
-  'minimax.io'
+  'ideogram.ai'
 ];
 
 function isAiDomain(domain) {
