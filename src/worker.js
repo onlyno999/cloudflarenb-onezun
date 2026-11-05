@@ -74,7 +74,55 @@ const AI_DOMAINS = [
   'x.ai',
   'grok.com',
   'perplexity.ai',
-  'poe.com'
+  'poe.com',
+
+  // === 2026-11-05 扩充：对话 / 聚合 / API 平台 ===
+  'notebooklm.google.com',
+  'meta.ai',
+  'mistral.ai',
+  'deepseek.com',
+  'moonshot.ai',
+  'kimi.com',
+  'qwen.ai',
+  'openrouter.ai',
+  'groq.com',
+  'cohere.com',
+  'cohere.ai',
+  'together.ai',
+  'together.xyz',
+  'fireworks.ai',
+  'replicate.com',
+  'huggingface.co',
+  'hf.co',
+  'character.ai',
+  'phind.com',
+  'you.com',
+  'duck.ai',
+
+  // === AI 编程 ===
+  'githubcopilot.com',
+  'cursor.com',
+  'cursor.sh',
+  'windsurf.com',
+  'codeium.com',
+
+  // === AI 绘画 / 视频 / 音频 ===
+  'midjourney.com',
+  'stability.ai',
+  'runwayml.com',
+  'lumalabs.ai',
+  'pika.art',
+  'klingai.com',
+  'sora.com',
+  'heygen.com',
+  'elevenlabs.io',
+  'suno.com',
+  'suno.ai',
+  'udio.com',
+  'leonardo.ai',
+  'ideogram.ai',
+  'hailuoai.com',
+  'minimax.io'
 ];
 
 function isAiDomain(domain) {
