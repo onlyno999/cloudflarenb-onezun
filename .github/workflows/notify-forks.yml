@@ -1,0 +1,25 @@
+name: Notify Forks About New Updates
+
+on:
+  push:
+    branches:
+      - main  # 或者你实际的默认分支名称（比如 master）
+
+jobs:
+  notify_forks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create a new issue to notify forks
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 获取所有的 fork 仓库
+          forks=$(curl -s https://api.github.com/repos/${{ github.repository }}/forks)
+
+          # 遍历每个 fork
+          for fork in $(echo "$forks" | jq -r '.[].full_name'); do
+            # 创建一个 Issue 通知更新
+            curl -X POST https://api.github.com/repos/$fork/issues \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -d '{"title": "New Update Available", "body": "There is a new update in the repository. Please sync your fork.", "assignees": []}'
+          done
